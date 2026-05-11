@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BFS x Delivery</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --accent: #226d7a;
+    --accent-soft: #e8eef0;
+    --ok: #2e9c4d;
+    --warn: #b85e00;
+    --closed: #b00020;
+    --muted: #6b6b6b;
+    --bg: #fafaf8;
+    --card: #ffffff;
+    --line: #e6e3dd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    color: #222;
+    background: var(--bg);
+    min-height: 100vh;
+  }
+  header {
+    background: white;
+    border-bottom: 1px solid var(--line);
+    padding: 16px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .container { max-width: 1280px; margin: 0 auto; padding: 24px; }
+  h1 { font-size: 20px; margin: 0 0 12px; font-weight: 700; }
+  h1 .sub { font-weight: 400; color: var(--muted); font-size: 14px; }
+
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .address-wrap { position: relative; flex: 1; min-width: 240px; }
+  input[type=text] {
+    width: 100%;
+    padding: 10px 12px; font-size: 15px;
+    border: 1px solid #ccc; border-radius: 6px;
+    background: white;
+  }
+  input[type=text]:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  .suggest-panel {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: white; border: 1px solid var(--line);
+    border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    z-index: 30; max-height: 280px; overflow-y: auto;
+  }
+  .suggest-item {
+    padding: 8px 12px; cursor: pointer; font-size: 14px;
+    border-bottom: 1px solid #f1f1f1;
+  }
+  .suggest-item:last-child { border-bottom: 0; }
+  .suggest-item:hover, .suggest-item.active { background: var(--accent-soft); color: var(--accent); }
+  .suggest-empty { padding: 10px 12px; color: var(--muted); font-size: 13px; font-style: italic; }
+  button {
+    padding: 10px 16px; font-size: 14px;
+    border: 0; border-radius: 6px; cursor: pointer;
+    background: var(--accent); color: white; font-weight: 500;
+  }
+  button.secondary { background: white; color: var(--accent); border: 1px solid var(--accent); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .summary {
+    margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+    color: var(--muted); font-size: 13px; align-items: center;
+  }
+  .summary .pill {
+    padding: 3px 10px; border-radius: 999px; background: var(--accent-soft);
+    color: var(--accent); font-weight: 500;
+  }
+  .summary .pill.err { background: #fde6e6; color: var(--closed); }
+  .summary .freshness { color: var(--muted); font-weight: 400; margin-left: 2px; }
+  .summary .total-counts { margin-left: auto; }
+
+  .filters { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .filters .label { font-size: 13px; color: var(--muted); margin-right: 2px; }
+
+  /* Selected-cuisines pills shown inline before the dropdown */
+  .selected-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 6px 3px 10px; border-radius: 999px;
+    background: var(--accent); color: white;
+    font-size: 12px;
+  }
+  .selected-chip .x { cursor: pointer; font-weight: 700; padding: 0 2px; opacity: 0.8; }
+  .selected-chip .x:hover { opacity: 1; }
+
+  /* Cuisine filter dropdown */
+  .filter-dd { position: relative; }
+  .filter-dd-button {
+    padding: 6px 12px; font-size: 13px;
+    background: white; color: var(--accent);
+    border: 1px solid var(--line); border-radius: 999px;
+    cursor: pointer;
+  }
+  .filter-dd-button:hover { background: #f7f9fa; }
+  .filter-dd-panel {
+    position: absolute; top: calc(100% + 4px); left: 0;
+    background: white; border: 1px solid var(--line);
+    border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    min-width: 240px; max-width: 320px;
+    z-index: 20;
+    display: flex; flex-direction: column;
+  }
+  .filter-dd-search {
+    padding: 8px 10px; border: 0; border-bottom: 1px solid var(--line);
+    font-size: 13px; outline: none;
+    border-radius: 8px 8px 0 0;
+  }
+  .filter-dd-list {
+    max-height: 280px; overflow-y: auto;
+  }
+  .filter-dd-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 12px; cursor: pointer;
+    font-size: 13px;
+  }
+  .filter-dd-item:hover { background: #f5f5f3; }
+  .filter-dd-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+  .filter-dd-item .count { color: var(--muted); font-size: 11px; }
+  .filter-dd-item.active .count { color: var(--accent); }
+  .filter-dd-empty { padding: 14px; color: var(--muted); font-size: 13px; text-align: center; }
+  .chip-clear { color: var(--muted); text-decoration: underline; cursor: pointer; font-size: 13px; }
+
+  .err {
+    background: #fde6e6; color: var(--closed); padding: 12px;
+    border-radius: 6px; margin: 12px 0;
+  }
+
+  /* Dismissible info banner explaining Wolt's address-set flow */
+  .info-banner {
+    margin: 10px 0 0;
+    padding: 8px 12px;
+    background: #fff7e6; color: #6b4500;
+    border: 1px solid #f4d68a;
+    border-radius: 6px;
+    font-size: 13px; line-height: 1.4;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .info-banner .dismiss {
+    margin-left: auto; cursor: pointer; padding: 0 6px;
+    color: #6b4500; opacity: 0.6; font-weight: 700; font-size: 16px;
+  }
+  .info-banner .dismiss:hover { opacity: 1; }
+
+  /* Toast for the click-to-copy-address hint */
+  .toast {
+    position: fixed; bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    background: #222; color: white;
+    padding: 10px 16px; border-radius: 999px;
+    font-size: 13px; z-index: 100;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+    animation: toast-in 0.18s ease-out;
+    max-width: calc(100vw - 24px);
+    text-align: center;
+  }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translate(-50%, 8px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+  }
+
+  .section-h {
+    margin: 28px 0 12px; font-size: 16px; font-weight: 600; color: #444;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-h .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .section-h .dot.open { background: var(--ok); }
+  .section-h .dot.closed { background: var(--closed); opacity: 0.6; }
+  .section-h .dot.gray { background: #c0c0c0; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+  .card.dim { opacity: 0.65; }
+
+  .card .image-wrap {
+    position: relative; aspect-ratio: 4 / 3;
+    background: #eee; overflow: hidden;
+  }
+  .card .image-wrap img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+  }
+  .card .image-wrap .neighborhood-tag {
+    position: absolute; top: 10px; left: 10px;
+    background: rgba(0,0,0,0.65); color: white;
+    padding: 3px 9px; border-radius: 4px; font-size: 12px;
+    text-transform: lowercase;
+  }
+  .card .body { padding: 14px; flex: 1; display: flex; flex-direction: column; }
+
+  .card h3 { margin: 0 0 4px; font-size: 17px; line-height: 1.25; }
+  .card h3 a { color: inherit; text-decoration: none; }
+  .card h3 a:hover { color: var(--accent); }
+
+  .card .cuisines {
+    margin: 6px 0; display: flex; flex-wrap: wrap; gap: 4px;
+  }
+  .card .cuisines span {
+    font-size: 11px; padding: 2px 8px;
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: 999px;
+  }
+
+  .card .desc-short {
+    color: #222; font-size: 13.5px; line-height: 1.5;
+    font-weight: 600;
+    margin: 8px 0 4px;
+    white-space: pre-wrap;
+  }
+  .card .desc-long {
+    color: #555; font-size: 13px; line-height: 1.6;
+    margin: 4px 0 6px;
+    white-space: pre-wrap;
+  }
+  .card .addr { color: var(--muted); font-size: 12px; margin-top: auto; padding-top: 8px; }
+  .card .locations-hint {
+    color: var(--muted); font-size: 11px; font-style: italic; margin-top: 2px;
+  }
+
+  .card .delivery-row {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    padding: 0 14px 14px;
+  }
+  .card .delivery-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 6px;
+    text-decoration: none; font-size: 13px; font-weight: 500;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .card .delivery-pill .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+  }
+  .card .delivery-pill .status-dot.open { background: var(--ok); }
+  .card .delivery-pill .status-dot.closed { background: var(--closed); }
+  .card .delivery-pill .status-dot.unknown { background: #c0c0c0; }
+  .card .delivery-pill.closed {
+    background: #f5f0ee; color: var(--muted);
+  }
+  .card .delivery-pill.unknown {
+    background: #f1f1f1; color: var(--muted);
+  }
+  .card .delivery-pill.closed::after { content: " (geschlossen)"; font-weight: 400; }
+  .card .delivery-pill.missing {
+    background: #f5f5f3; color: #aaa; cursor: default;
+    text-decoration: line-through;
+  }
+  .card .delivery-pill.missing::after { content: ""; }
+
+  .card .nodelivery {
+    padding: 8px 14px 14px; color: var(--muted); font-size: 12px; font-style: italic;
+  }
+
+  /* Loading state */
+  .loading { padding: 40px; text-align: center; color: var(--muted); font-size: 14px; }
+  .loading .spinner {
+    display: inline-block; width: 20px; height: 20px;
+    border: 2px solid var(--line); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+    vertical-align: middle; margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  details summary { cursor: pointer; padding: 8px 0; color: var(--muted); }
+
+  /* ============================================================
+     Mobile — phones and narrow tablets
+     ============================================================ */
+  @media (max-width: 640px) {
+    header { padding: 10px 12px; }
+    .container { padding: 12px; }
+
+    /* Tighten the header title; subtitle is dead weight on a tiny screen */
+    h1 { font-size: 17px; margin-bottom: 8px; }
+    h1 .sub { display: none; }
+
+    /* The address input takes the full row; buttons share the next row
+       so the layout is predictable instead of flex-wrap-roulette. */
+    .controls { gap: 6px; }
+    .address-wrap { flex: 0 0 100%; min-width: 0; }
+    .controls button {
+      flex: 1 1 0;
+      padding: 11px 8px;       /* taller for ~44px tap target, narrower h-padding */
+      font-size: 14px;
+      min-width: 0;
+      white-space: nowrap;
+    }
+
+    /* Summary line: don't force the counter to the far right via auto-margin
+       (with flex-wrap that pushes it onto its own line awkwardly). Let
+       everything flow naturally. */
+    .summary { gap: 6px 8px; font-size: 12px; }
+    .summary .total-counts { margin-left: 0 !important; width: 100%; }
+
+    /* Filter dropdown as a bottom-anchored sheet on mobile — the original
+       absolute-positioned dropdown can overflow viewport when the trigger
+       button sits near the right edge. */
+    .filter-dd-panel {
+      position: fixed;
+      top: auto; bottom: 12px;
+      left: 12px; right: 12px;
+      min-width: 0; max-width: none;
+      max-height: 60vh;
+    }
+    .filter-dd-list { max-height: calc(60vh - 50px); }
+
+    /* Single-column card grid. Smaller image (3:2 instead of 4:3) so the
+       text fits above the fold and you can see more cards while scrolling. */
+    .grid { grid-template-columns: 1fr; gap: 12px; }
+    .card .image-wrap { aspect-ratio: 3 / 2; }
+
+    /* Slightly larger delivery pills for finger taps */
+    .card .delivery-row { padding: 0 12px 12px; gap: 8px; }
+    .card .delivery-pill { padding: 8px 12px; font-size: 14px; }
+    .card .body { padding: 12px; }
+
+    .section-h { margin: 20px 0 10px; }
+
+    /* On scroll the sticky header eats vertical real estate; if a chip
+       row is also there, things get tight. Allow it to scroll out by
+       removing position:sticky on narrow screens. */
+    header { position: static; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+  <div class="container" style="padding: 0;">
+    <h1>BFS x Delivery <span class="sub">— what Berlin Food Stories places deliver to your address?</span></h1>
+    <div class="controls">
+      <div class="address-wrap" v-click-outside="closeSuggest">
+        <input
+          type="text"
+          v-model="address"
+          @input="onAddressInput"
+          @focus="onAddressFocus"
+          @keydown.down.prevent="moveSuggest(1)"
+          @keydown.up.prevent="moveSuggest(-1)"
+          @keydown.enter.prevent="onAddressEnter"
+          @keydown.esc="closeSuggest"
+          placeholder="Sonnenallee 100, 12045 Berlin"
+          autocomplete="off"
+          autofocus
+        >
+        <div class="suggest-panel" v-if="suggestOpen && (suggestions.length || suggestEmpty)">
+          <div v-if="suggestions.length">
+            <div
+              v-for="(s, idx) in suggestions"
+              :key="s.label"
+              :class="['suggest-item', idx === suggestIdx ? 'active' : '']"
+              @mousedown.prevent="pickSuggest(s)"
+              @mouseenter="suggestIdx = idx"
+            >{{ s.label }}</div>
+          </div>
+          <div v-else class="suggest-empty">no Berlin matches for “{{ address }}”</div>
+        </div>
+      </div>
+      <button @click="check" :disabled="loading">{{ loading ? 'Checking…' : 'Check' }}</button>
+      <button v-if="homeAddress" class="secondary" @click="useHome" :disabled="loading" :title="homeAddress">🏠 Дом</button>
+      <button class="secondary" @click="refresh" :disabled="loading || !address">Refresh</button>
+    </div>
+    <div v-if="result" class="summary">
+      <span>{{ result.address }}</span>
+      <span class="pill" v-for="(info, plat) in result.platforms" :key="plat" :class="{err: info.status==='error'}">
+        {{ plat }}:
+        <template v-if="info.status === 'ok'">
+          {{ info.matched }} matched
+          <span class="freshness">· {{ formatAge(info.age_sec) }}</span>
+        </template>
+        <template v-else>error</template>
+      </span>
+      <span class="total-counts">{{ deliverableNow.length }} open · {{ deliverableClosed.length }} closed · {{ noDelivery.length }} no delivery</span>
+    </div>
+    <div v-if="result && allCuisines.length" class="filters">
+      <span class="label">Cuisine:</span>
+      <span v-for="c in activeCuisinesArray" :key="c" class="selected-chip">
+        {{ c }} <span class="x" @click="toggleCuisine(c)">×</span>
+      </span>
+      <div class="filter-dd" v-click-outside="closeFilterDD">
+        <button class="filter-dd-button" @click="filterDDOpen = !filterDDOpen">
+          {{ activeCuisines.size ? '+ Add' : 'Filter…' }} ▾
+        </button>
+        <div class="filter-dd-panel" v-if="filterDDOpen">
+          <input type="text" class="filter-dd-search"
+                 v-model="filterQuery"
+                 placeholder="Type to filter (e.g. ‘ramen’, ‘turkish’)"
+                 ref="filterSearch">
+          <div class="filter-dd-list">
+            <div v-for="c in filteredCuisineOptions" :key="c.name"
+                 :class="['filter-dd-item', activeCuisines.has(c.name) ? 'active' : '']"
+                 @click="toggleCuisine(c.name)">
+              <span>{{ c.name }}</span>
+              <span class="count">{{ c.count }}</span>
+            </div>
+            <div v-if="!filteredCuisineOptions.length" class="filter-dd-empty">
+              No cuisines match “{{ filterQuery }}”
+            </div>
+          </div>
+        </div>
+      </div>
+      <span v-if="activeCuisines.size" class="chip-clear" @click="clearCuisines">Clear all</span>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <div v-if="error" class="err">{{ error }}</div>
+
+  <div v-if="result && !infoDismissed" class="info-banner">
+    <span>ℹ️ Both Wolt and Uber Eats require you to set your address on their site before showing the order button. Clicking a delivery link copies your address — paste it into "Choose location" on Wolt or the address bar on Uber Eats.</span>
+    <span class="dismiss" @click="dismissInfo" title="Got it">×</span>
+  </div>
+
+  <div v-if="toastMsg" class="toast">{{ toastMsg }}</div>
+
+  <div v-if="loading && !result" class="loading">
+    <span class="spinner"></span> Checking Wolt + Uber Eats live…
+  </div>
+
+  <template v-if="result">
+    <h2 class="section-h">
+      <span class="dot open"></span>
+      Delivering now <span style="color:var(--muted); font-weight:400;">({{ deliverableNow.length }})</span>
+    </h2>
+    <div v-if="deliverableNow.length" class="grid">
+      <div v-for="p in deliverableNow" :key="p.bfs_url + p.address" class="card">
+        <div class="image-wrap">
+          <img v-if="p.image" :src="p.image" :alt="p.bfs_name" loading="lazy">
+          <span v-if="p.neighborhood" class="neighborhood-tag">{{ p.neighborhood }}</span>
+        </div>
+        <div class="body">
+          <h3><a :href="p.bfs_url" target="_blank">{{ p.bfs_name }}</a></h3>
+          <div v-if="p.cuisines.length" class="cuisines">
+            <span v-for="c in p.cuisines" :key="c">{{ c }}</span>
+          </div>
+          <div v-if="p.description" class="desc-short">{{ p.description }}</div>
+          <div v-if="p.long_description" class="desc-long">{{ p.long_description }}</div>
+          <div class="addr">{{ p.address }}</div>
+          <div v-if="p.location_count > 1" class="locations-hint">
+            chain · {{ p.location_count }} locations
+          </div>
+        </div>
+        <div class="delivery-row">
+          <template v-for="plat in ALL_PLATFORMS" :key="plat">
+            <a v-if="deliveryFor(p, plat)"
+               :href="deliveryFor(p, plat).url" target="_blank"
+               @click="onDeliveryClick"
+               :class="['delivery-pill', deliveryFor(p, plat).is_open === false ? 'closed' : (deliveryFor(p, plat).is_open === null ? 'unknown' : '')]">
+              <span :class="['status-dot', deliveryFor(p, plat).is_open === true ? 'open' : (deliveryFor(p, plat).is_open === false ? 'closed' : 'unknown')]"></span>
+              {{ plat }}
+            </a>
+            <span v-else
+                  class="delivery-pill missing"
+                  :title="plat + ' does not list this place at this address right now. Uber Eats hides closed places, so a missing badge here usually means closed or not delivered to your area.'">
+              <span class="status-dot unknown"></span>
+              {{ plat }}
+            </span>
+          </template>
+        </div>
+      </div>
+    </div>
+    <div v-else class="loading">Nothing from BFS is currently delivering to {{ result.address }}.</div>
+
+    <h2 v-if="deliverableClosed.length" class="section-h">
+      <span class="dot closed"></span>
+      Listed but currently closed <span style="color:var(--muted); font-weight:400;">({{ deliverableClosed.length }})</span>
+    </h2>
+    <div v-if="deliverableClosed.length" class="grid">
+      <div v-for="p in deliverableClosed" :key="p.bfs_url + p.address" class="card dim">
+        <div class="image-wrap">
+          <img v-if="p.image" :src="p.image" :alt="p.bfs_name" loading="lazy">
+          <span v-if="p.neighborhood" class="neighborhood-tag">{{ p.neighborhood }}</span>
+        </div>
+        <div class="body">
+          <h3><a :href="p.bfs_url" target="_blank">{{ p.bfs_name }}</a></h3>
+          <div v-if="p.cuisines.length" class="cuisines">
+            <span v-for="c in p.cuisines" :key="c">{{ c }}</span>
+          </div>
+          <div v-if="p.description" class="desc-short">{{ p.description }}</div>
+          <div v-if="p.long_description" class="desc-long">{{ p.long_description }}</div>
+          <div class="addr">{{ p.address }}</div>
+          <div v-if="p.location_count > 1" class="locations-hint">
+            chain · {{ p.location_count }} locations
+          </div>
+        </div>
+        <div class="delivery-row">
+          <template v-for="plat in ALL_PLATFORMS" :key="plat">
+            <a v-if="deliveryFor(p, plat)"
+               :href="deliveryFor(p, plat).url" target="_blank"
+               @click="onDeliveryClick"
+               :class="['delivery-pill', deliveryFor(p, plat).is_open === false ? 'closed' : (deliveryFor(p, plat).is_open === null ? 'unknown' : '')]">
+              <span :class="['status-dot', deliveryFor(p, plat).is_open === true ? 'open' : (deliveryFor(p, plat).is_open === false ? 'closed' : 'unknown')]"></span>
+              {{ plat }}
+            </a>
+            <span v-else
+                  class="delivery-pill missing"
+                  :title="plat + ' does not list this place at this address right now. Uber Eats hides closed places, so a missing badge here usually means closed or not delivered to your area.'">
+              <span class="status-dot unknown"></span>
+              {{ plat }}
+            </span>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <details v-if="noDelivery.length">
+      <summary>Not on any delivery platform here ({{ noDelivery.length }})</summary>
+      <div class="grid" style="margin-top:12px">
+        <div v-for="p in noDelivery" :key="p.bfs_url + p.address" class="card dim">
+          <div class="image-wrap">
+            <img v-if="p.image" :src="p.image" :alt="p.bfs_name" loading="lazy">
+            <span v-if="p.neighborhood" class="neighborhood-tag">{{ p.neighborhood }}</span>
+          </div>
+          <div class="body">
+            <h3><a :href="p.bfs_url" target="_blank">{{ p.bfs_name }}</a></h3>
+            <div v-if="p.cuisines.length" class="cuisines">
+              <span v-for="c in p.cuisines" :key="c">{{ c }}</span>
+            </div>
+            <div v-if="p.description" class="desc-short">{{ p.description }}</div>
+          <div v-if="p.long_description" class="desc-long">{{ p.long_description }}</div>
+            <div class="addr">{{ p.address }}</div>
+            <div v-if="p.location_count > 1" class="locations-hint">
+              chain · {{ p.location_count }} locations
+            </div>
+          </div>
+          <div class="nodelivery">No Wolt / Uber Eats listing.</div>
+        </div>
+      </div>
+    </details>
+  </template>
+</div>
+</div><!-- /#app -->
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+const { createApp } = Vue;
+
+// Fixed display order for delivery platform badges on every card.
+// Cards always render all three; absent ones get the "missing" treatment.
+const ALL_PLATFORMS = ["wolt", "ubereats"];
+
+const app = createApp({
+  data() {
+    return {
+      address: '',
+      loading: false,
+      result: null,
+      error: null,
+      homeAddress: null,      // populated from /api/settings on mount; null hides the 🏠 button
+      toastMsg: '',
+      _toastTimer: null,
+      infoDismissed: false,
+      activeCuisines: new Set(),
+      filterDDOpen: false,
+      filterQuery: '',
+      ALL_PLATFORMS,
+      // Address autocomplete state
+      suggestions: [],
+      suggestOpen: false,
+      suggestIdx: -1,
+      suggestEmpty: false,    // true after a query returned 0 hits
+      _suggestTimer: null,
+      _suggestSeq: 0,         // race-condition guard for out-of-order responses
+      // Reactivity bump for the Set (Vue 3 doesn't deep-watch Sets)
+      _filterTick: 0,
+    };
+  },
+  computed: {
+    allPlaces() { return this.result?.places || []; },
+    filteredPlaces() {
+      this._filterTick;  // touch for reactivity
+      const acts = this.activeCuisines;
+      if (!acts.size) return this.allPlaces;
+      return this.allPlaces.filter(p =>
+        (p.cuisines || []).some(c => acts.has(c))
+      );
+    },
+    deliverableNow() { return this.filteredPlaces.filter(p => p.any_open_now); },
+    deliverableClosed() {
+      return this.filteredPlaces.filter(p => !p.any_open_now && p.any_listed);
+    },
+    noDelivery() {
+      return this.filteredPlaces.filter(p => !p.any_listed);
+    },
+    allCuisines() {
+      // Only count cuisines from places that are currently delivering now —
+      // the filter is meant for "what can I actually order right now", not
+      // "what's in the entire BFS catalog including closed/unlisted places".
+      const counts = {};
+      for (const p of this.allPlaces) {
+        if (!p.any_open_now) continue;
+        for (const c of (p.cuisines || [])) {
+          counts[c] = (counts[c] || 0) + 1;
+        }
+      }
+      return Object.entries(counts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    },
+    filteredCuisineOptions() {
+      const q = this.filterQuery.trim().toLowerCase();
+      if (!q) return this.allCuisines;
+      return this.allCuisines.filter(c => c.name.toLowerCase().includes(q));
+    },
+    activeCuisinesArray() {
+      this._filterTick;
+      return Array.from(this.activeCuisines).sort();
+    },
+  },
+  async mounted() {
+    try {
+      const r = await fetch('/api/settings');
+      const s = await r.json();
+      this.homeAddress = s.home_address || null;
+    } catch (e) {
+      // /api/settings is optional; ignore failures
+    }
+    try {
+      this.infoDismissed = localStorage.getItem('bfd_info_dismissed') === '1';
+    } catch (e) {}
+  },
+  watch: {
+    result() {
+      this.activeCuisines = new Set();
+      this.filterQuery = '';
+      this._filterTick++;
+    },
+    filterDDOpen(open) {
+      if (open) {
+        this.$nextTick(() => this.$refs.filterSearch && this.$refs.filterSearch.focus());
+      } else {
+        this.filterQuery = '';
+      }
+    },
+  },
+  methods: {
+    toggleCuisine(c) {
+      if (this.activeCuisines.has(c)) this.activeCuisines.delete(c);
+      else this.activeCuisines.add(c);
+      this._filterTick++;
+    },
+    clearCuisines() {
+      this.activeCuisines = new Set();
+      this._filterTick++;
+    },
+    closeFilterDD() { this.filterDDOpen = false; },
+    dismissInfo() {
+      this.infoDismissed = true;
+      try { localStorage.setItem('bfd_info_dismissed', '1'); } catch (e) {}
+    },
+    showToast(msg, ms = 3500) {
+      this.toastMsg = msg;
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(() => { this.toastMsg = ''; }, ms);
+    },
+    onDeliveryClick() {
+      // Both Wolt and Uber Eats require the user to set their delivery
+      // address on the platform's own site before showing the order
+      // button. Pre-copying the address makes pasting one keystroke.
+      const addr = this.result && this.result.address ? this.result.address : this.address;
+      if (!addr) return;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(addr);
+          this.showToast(`✓ ${addr} copied — paste it on the platform's "Choose location"`);
+        } else {
+          this.showToast(`Set this address on the platform: ${addr}`);
+        }
+      } catch (e) {
+        this.showToast(`Set this address on the platform: ${addr}`);
+      }
+    },
+    deliveryFor(place, platform) {
+      return (place.delivery || []).find(d => d.platform === platform) || null;
+    },
+    // Address autocomplete
+    onAddressInput() {
+      this.suggestIdx = -1;
+      this.suggestEmpty = false;
+      clearTimeout(this._suggestTimer);
+      const q = this.address.trim();
+      if (q.length < 2) {
+        this.suggestions = [];
+        this.suggestOpen = false;
+        return;
+      }
+      this._suggestTimer = setTimeout(() => this.fetchSuggestions(q), 250);
+    },
+    onAddressFocus() {
+      if (this.suggestions.length) this.suggestOpen = true;
+    },
+    async fetchSuggestions(q) {
+      const seq = ++this._suggestSeq;
+      try {
+        const r = await fetch('/api/suggest?q=' + encodeURIComponent(q));
+        const data = await r.json();
+        if (seq !== this._suggestSeq) return;  // stale response
+        this.suggestions = data.suggestions || [];
+        this.suggestOpen = true;
+        this.suggestEmpty = this.suggestions.length === 0;
+      } catch (e) {
+        if (seq !== this._suggestSeq) return;
+        this.suggestions = [];
+        this.suggestOpen = false;
+      }
+    },
+    moveSuggest(delta) {
+      if (!this.suggestOpen || !this.suggestions.length) return;
+      const n = this.suggestions.length;
+      this.suggestIdx = (this.suggestIdx + delta + n) % n;
+    },
+    onAddressEnter() {
+      if (this.suggestOpen && this.suggestIdx >= 0) {
+        this.pickSuggest(this.suggestions[this.suggestIdx]);
+      } else {
+        this.closeSuggest();
+        this.check();
+      }
+    },
+    pickSuggest(s) {
+      this.address = s.label;
+      this.suggestions = [];
+      this.suggestOpen = false;
+      this.suggestIdx = -1;
+      this.check();
+    },
+    closeSuggest() {
+      this.suggestOpen = false;
+      this.suggestIdx = -1;
+    },
+    formatAge(sec) {
+      if (sec == null || sec <= 1) return 'live';
+      if (sec < 60) return sec + 's ago';
+      const m = Math.floor(sec / 60);
+      if (m < 60) return m + 'm ago';
+      const h = Math.floor(m / 60);
+      return h + 'h ago';
+    },
+    useHome() {
+      if (!this.homeAddress) return;
+      this.address = this.homeAddress;
+      this.check();
+    },
+    async check() {
+      if (!this.address.trim()) return;
+      this.loading = true; this.error = null;
+      try {
+        const r = await fetch('/api/check?address=' + encodeURIComponent(this.address));
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.detail || ('HTTP ' + r.status));
+        }
+        this.result = await r.json();
+      } catch (e) {
+        this.error = String(e.message || e);
+      } finally {
+        this.loading = false;
+      }
+    },
+    async refresh() {
+      if (!this.address.trim()) return;
+      this.loading = true; this.error = null;
+      try {
+        await fetch('/api/refresh', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: this.address }),
+        });
+        await this.check();
+      } catch (e) {
+        this.error = String(e.message || e);
+      } finally {
+        this.loading = false;
+      }
+    },
+  },
+});
+
+// Custom directive: close an element when user clicks outside of it.
+// Used by the cuisine filter dropdown.
+app.directive('click-outside', {
+  mounted(el, binding) {
+    el._clickOutside = (e) => {
+      if (!el.contains(e.target)) binding.value(e);
+    };
+    document.addEventListener('click', el._clickOutside, true);
+  },
+  unmounted(el) {
+    document.removeEventListener('click', el._clickOutside, true);
+  },
+});
+
+app.mount('#app');
+</script>
+</body>
+</html>
